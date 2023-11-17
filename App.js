@@ -10,9 +10,12 @@ import {
   TouchableOpacity,
 } from "react-native";
 import * as React from "react";
-import { NavigationContainer } from "@react-navigation/native";
 import { ClerkProvider, SignedIn, SignedOut, useAuth } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
+import MapView from "react-native-maps";
+import { Marker } from "react-native-maps";
+import Geolocation from "react-native-geolocation-service";
+import { NavigationContainer, useNavigation } from "@react-navigation/native";
 import {
   Chip,
   PaperProvider,
@@ -32,17 +35,16 @@ import { createDrawerNavigator } from "@react-navigation/drawer";
 import { LoginFlow } from "./loginFlow";
 import EditProfile from "./editProfile";
 import { useUser } from "@clerk/clerk-react";
-
-const screenWidth = Dimensions.get("window").width;
+import * as Location from "expo-location";
 
 const Drawer = createDrawerNavigator();
 
 function DrawerNavigator() {
   return (
     <Drawer.Navigator>
-      <Drawer.Screen name="Stack" component={Home} />
-      <Drawer.Screen name="Article" component={SettingsScreen} />
-      <Drawer.Screen name="Profile" component={Profile} />
+      <Drawer.Screen name="Газрын зураг" component={Home} />
+      <Drawer.Screen name="Төлбөр" component={Payment} />
+      <Drawer.Screen name="Тохиргоо" component={SignOut} />
     </Drawer.Navigator>
   );
 }
@@ -53,72 +55,25 @@ function TabNavigator() {
   return (
     <Tab.Navigator>
       <Tab.Screen
-        name="Home"
+        name="Гэр"
         component={HomeScreen}
         options={{ headerShown: false }}
       />
       <Tab.Screen
-        name="Setting"
-        component={SettingsScreen}
-        options={{ headerShown: false }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={Profile}
+        name="Төлбөр"
+        component={Payment}
         options={{ headerShown: false }}
       />
     </Tab.Navigator>
   );
 }
 
-function SettingsScreen() {
+function Payment() {
   return (
     <View>
-      <Text>Settings</Text>
+      <Text>Төлбөр</Text>
     </View>
   );
-}
-
-function Profile({ navigation }) {
-  const { isSignedIn, user, isLoaded } = useUser();
-
-  if (!isLoaded) {
-    return null;
-  }
-
-  if (isSignedIn) {
-    console.log(user);
-    return (
-      <View style={{ flex: 1, alignItems: "center" }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            padding: 8,
-            backgroundColor: "blue",
-            borderRadius: 15,
-            width: "95%",
-            justifyContent: "space-between",
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Image
-              source={require("./assets/men.jpeg")}
-              style={{ width: 80, height: 80, borderRadius: 50 }}
-            />
-            <View style={{ marginLeft: 20 }}>
-              <Text style={{ color: "white" }}>{user.fullName}</Text>
-              <Text style={{ color: "white" }}>Email</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity onPress={() => navigation.navigate("EditProfile")}>
-            <Feather name="edit" size={34} color="white" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
 }
 
 const SignOut = () => {
@@ -134,8 +89,7 @@ const SignOut = () => {
           signOut();
         }}
         mode="contained"
-        style={{ marginTop: 10 }}
-      >
+        style={{ marginTop: 10 }}>
         {" "}
         Sign Out
       </Button>
@@ -155,7 +109,6 @@ export default function App() {
           <NavigationContainer>
             <DrawerNavigator />
           </NavigationContainer>
-          <SignOut />
         </SignedIn>
 
         <SignedOut>
@@ -181,52 +134,45 @@ function Home() {
   );
 }
 
-function HomeScreen({ navigation }) {
-  const [articles, setArticles] = useState([]);
+function HomeScreen() {
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    fetch("https://dev.to/api/articles?username=ben")
-      .then((res) => res.json())
-      .then((data) => {
-        setArticles(data);
-      });
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        console.error("Permission to access location was denied");
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+      setCurrentLocation({ latitude, longitude });
+    })();
   }, []);
 
   return (
-    <ScrollView>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#fff",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Text> HomeScreen</Text>
-        <View style={{ flexDirection: "row" }}>
-          {/* <Button
-            icon="camera"
-            mode="contained"
-            onPress={() => navigation.navigate("Detail", { id: 23 })}
-          >
-            Details
-          </Button> */}
-        </View>
-
-        {articles.map((article) => (
-          <View key={article.id}>
-            <Card
-              style={{ width: screenWidth, marginTop: 30 }}
-              onPress={() => navigation.navigate("Detail", { id: article.id })}
-            >
-              <Card.Content>
-                <Card.Cover source={{ uri: article.cover_image }}></Card.Cover>
-                <Text>{article.title}</Text>
-              </Card.Content>
-            </Card>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+    <View style={{ flex: 1 }}>
+      {currentLocation && (
+        <MapView
+          style={{ flex: 1 }}
+          initialRegion={{
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          }}>
+          <Marker
+            coordinate={{
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+            }}
+            title="You are here"
+            description="Your current location"
+          />
+        </MapView>
+      )}
+    </View>
   );
 }
